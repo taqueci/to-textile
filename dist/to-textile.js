@@ -189,7 +189,7 @@ function flankingWhitespace (node, content) {
  * `_replacement`
  */
 
-function process (node) {
+function process (node, options) {
   var replacement
   var content = getContent(node)
 
@@ -215,7 +215,7 @@ function process (node) {
         content = content.trim()
       }
       replacement = whitespace.leading +
-        converter.replacement.call(toTextile, content, node) +
+        converter.replacement.call(toTextile, content, node, options) +
         whitespace.trailing
       break
     }
@@ -251,9 +251,13 @@ toTextile = function (input, options) {
     converters = options.converters.concat(converters)
   }
 
+  if (options.attributeBlocks !== false) {
+    options.attributeBlocks = true;
+  }
+
   // Process through nodes in reverse (so deepest child elements are first).
   for (var i = nodes.length - 1; i >= 0; i--) {
-    process(nodes[i])
+    process(nodes[i], options)
   }
   output = getContent(clone)
 
@@ -269,7 +273,7 @@ toTextile.outer = outer
 
 module.exports = toTextile
 
-},{"./lib/gfm-converters":2,"./lib/html-parser":3,"./lib/tex-converters":4,"collapse-whitespace":5}],2:[function(require,module,exports){
+},{"./lib/gfm-converters":2,"./lib/html-parser":3,"./lib/tex-converters":4,"collapse-whitespace":6}],2:[function(require,module,exports){
 'use strict'
 // TODO:
 module.exports = [];
@@ -449,8 +453,8 @@ function attrImg(node) { // like above, but for images
 module.exports = [
 	{
 		filter: 'p',
-		replacement: function(content, node) {
-			var a = attrBlock(node);
+		replacement: function(content, node, options) {
+			var a = options.attributeBlocks ? attrBlock(node) : '';
 			if (a.length)
 				return '\n\np' + a + '. ' + content + '\n\n'
 			else
@@ -468,8 +472,8 @@ module.exports = [
 
 	{
 		filter: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'],
-		replacement: function(content, node) {
-			var h = node.nodeName.toLowerCase() + attrBlock(node);
+		replacement: function(content, node, options) {
+			var h = node.nodeName.toLowerCase() + (options.attributeBlocks ? attrBlock(node) : '');
 			return '\n\n' + h + '. ' + content + '\n\n'
 		}
 	},
@@ -483,21 +487,21 @@ module.exports = [
 
 	{
 		filter: ['em', 'i'],
-		replacement: function(content, node) {
-			return '_' + attr(node) + content + '_'
+		replacement: function(content, node, options) {
+			return '_' + (options.attributeBlocks ? attr(node) : '') + content + '_'
 		}
 	},
 
 	{
 		filter: ['strong', 'b'],
-		replacement: function(content, node) {
-			return '**' + attr(node) + content + '**'
+		replacement: function(content, node, options) {
+			return '**' + (options.attributeBlocks ? attr(node) : '') + content + '**'
 		}
 	},
 	{
 		filter: ['span'],
-		replacement: function(content, node) {
-			var a = attr(node);
+		replacement: function(content, node, options) {
+			var a = options.attributeBlocks ? attr(node) : '';
 			if (a=='(caps)')
 				// undo textile automatically wrapping [A-Z]{3,} in a <span class="caps">...</span>
 				return content;
@@ -506,32 +510,32 @@ module.exports = [
 	},
 	{
 		filter: ['cite'],
-		replacement: function(content, node) {
-			return '??' + attr(node) + content + '??'
+		replacement: function(content, node, options) {
+			return '??' + (options.attributeBlocks ? attr(node) : '') + content + '??'
 		}
 	},
 	{
 		filter: ['del'],
-		replacement: function(content, node) {
-			return '-' + attr(node) + content + '-'
+		replacement: function(content, node, options) {
+			return '-' + (options.attributeBlocks ? attr(node) : '') + content + '-'
 		}
 	},
 	{
 		filter: ['ins'],
-		replacement: function(content, node) {
-			return '+' + attr(node) + content + '+'
+		replacement: function(content, node, options) {
+			return '+' + (options.attributeBlocks ? attr(node) : '') + content + '+'
 		}
 	},
 	{
 		filter: ['sup'],
-		replacement: function(content, node) {
-			return '^' + attr(node) + content + '^'
+		replacement: function(content, node, options) {
+			return '^' + (options.attributeBlocks ? attr(node) : '') + content + '^'
 		}
 	},
 	{
 		filter: ['sub'],
-		replacement: function(content, node) {
-			return '~' + attr(node) + content + '~'
+		replacement: function(content, node, options) {
+			return '~' + (options.attributeBlocks ? attr(node) : '') + content + '~'
 		}
 	},
 
@@ -543,8 +547,8 @@ module.exports = [
 
 			return node.nodeName === 'CODE' && !isCodeBlock
 		},
-		replacement: function(content, node) {
-			return '@' + attr(node) + content + '@'
+		replacement: function(content, node, options) {
+			return '@' + (options.attributeBlocks ? attr(node) : '') + content + '@'
 		}
 	},
 
@@ -552,7 +556,7 @@ module.exports = [
 		filter: function(node) {
 			return node.nodeName === 'A' && node.getAttribute('href')
 		},
-		replacement: function(content, node) {
+		replacement: function(content, node, options) {
 			var titlePart = node.title ? ' (' + node.title + ')' : '';
 			// CM TODO image links: !openwindow1.gif!:http://hobix.com/
 			return '\"' + content +  titlePart + '\":' + node.getAttribute('href')
@@ -561,12 +565,12 @@ module.exports = [
 
 	{
 		filter: 'img',
-		replacement: function(content, node) {
+		replacement: function(content, node, options) {
 			var alt = node.alt || ''
 			var src = node.getAttribute('src') || '';
 			var title = node.title || alt;
 			var titlePart = title.length ? '(' + title + ')' : '';
-			return src ? '!' + attrImg(node) + src + titlePart + '!' : ''
+			return src ? '!' + (options.attributeBlocks ? attrImg(node) : '') + src + titlePart + '!' : ''
 		}
 	},
 
@@ -575,23 +579,23 @@ module.exports = [
 		filter: function(node) {
 			return node.nodeName === 'PRE' && node.firstChild.nodeName === 'CODE'
 		},
-		replacement: function(content, node) {
-			return '\n\nbc' + attrBlock(node) + '. ' + node.firstChild.textContent + '\n\n'; 
+		replacement: function(content, node, options) {
+			return '\n\nbc' + (options.attributeBlocks ? attrBlock(node) : '') + '. ' + node.firstChild.textContent + '\n\n'; 
 		}
 	},
 
 	{
 		filter: 'blockquote',
-		replacement: function(content, node) {
+		replacement: function(content, node, options) {
 			content = content.trim()
 			content = content.replace(/\n{3,}/g, '\n\n')
-			return '\n\nbq' + attrBlock(node) + '. ' + content + '\n\n'
+			return '\n\nbq' + (options.attributeBlocks ? attrBlock(node) : '') + '. ' + content + '\n\n'
 		}
 	},
 
 	{
 		filter: 'li',
-		replacement: function(content, node) {
+		replacement: function(content, node, options) {
 			var prefix = /ul/i.test(node.parentNode.nodeName) ? '* ': '# ';
 			return prefix + content;
 		}
@@ -599,9 +603,9 @@ module.exports = [
 
 	{
 		filter: ['ul', 'ol'],
-		replacement: function(content, node) {
+		replacement: function(content, node, options) {
 			var strings = [];
-			var a = attr(node); 
+			var a = options.attributeBlocks ? attr(node) : '';
 			
 			for (var i = 0; i < node.childNodes.length; i++) {
 				if (i==0 && a.length) // first LI gets this Lists's attributes
@@ -646,6 +650,51 @@ module.exports = [
 ]
 
 },{}],5:[function(require,module,exports){
+/**
+ * This file automatically generated from `build.js`.
+ * Do not manually edit.
+ */
+
+module.exports = [
+  "address",
+  "article",
+  "aside",
+  "blockquote",
+  "canvas",
+  "dd",
+  "div",
+  "dl",
+  "dt",
+  "fieldset",
+  "figcaption",
+  "figure",
+  "footer",
+  "form",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+  "header",
+  "hgroup",
+  "hr",
+  "li",
+  "main",
+  "nav",
+  "noscript",
+  "ol",
+  "output",
+  "p",
+  "pre",
+  "section",
+  "table",
+  "tfoot",
+  "ul",
+  "video"
+];
+
+},{}],6:[function(require,module,exports){
 'use strict';
 
 var voidElements = require('void-elements');
@@ -783,51 +832,7 @@ function next(prev, current) {
 
 module.exports = collapseWhitespace;
 
-},{"block-elements":6,"void-elements":7}],6:[function(require,module,exports){
-/**
- * This file automatically generated from `build.js`.
- * Do not manually edit.
- */
-
-module.exports = [
-  "address",
-  "article",
-  "aside",
-  "audio",
-  "blockquote",
-  "canvas",
-  "dd",
-  "div",
-  "dl",
-  "fieldset",
-  "figcaption",
-  "figure",
-  "footer",
-  "form",
-  "h1",
-  "h2",
-  "h3",
-  "h4",
-  "h5",
-  "h6",
-  "header",
-  "hgroup",
-  "hr",
-  "main",
-  "nav",
-  "noscript",
-  "ol",
-  "output",
-  "p",
-  "pre",
-  "section",
-  "table",
-  "tfoot",
-  "ul",
-  "video"
-];
-
-},{}],7:[function(require,module,exports){
+},{"block-elements":5,"void-elements":7}],7:[function(require,module,exports){
 /**
  * This file automatically generated from `pre-publish.js`.
  * Do not manually edit.

@@ -188,7 +188,7 @@ function flankingWhitespace (node, content) {
  * `_replacement`
  */
 
-function process (node) {
+function process (node, options) {
   var replacement
   var content = getContent(node)
 
@@ -214,7 +214,7 @@ function process (node) {
         content = content.trim()
       }
       replacement = whitespace.leading +
-        converter.replacement.call(toTextile, content, node) +
+        converter.replacement.call(toTextile, content, node, options) +
         whitespace.trailing
       break
     }
@@ -250,9 +250,13 @@ toTextile = function (input, options) {
     converters = options.converters.concat(converters)
   }
 
+  if (options.attributeBlocks !== false) {
+    options.attributeBlocks = true;
+  }
+
   // Process through nodes in reverse (so deepest child elements are first).
   for (var i = nodes.length - 1; i >= 0; i--) {
-    process(nodes[i])
+    process(nodes[i], options)
   }
   output = getContent(clone)
 

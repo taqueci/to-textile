@@ -100,6 +100,10 @@ to-textile has beta support for GitHub flavored textile (GFM). Set the `gfm` opt
 toTextile('<del>Hello world!</del>', { gfm: true });
 ```
 
+### `attributeBlocks` (boolean) _Default: true_
+
+Set `attributeBlocks` to false to disable textile attribute blocks.
+
 ## Methods
 
 The following methods can be called on the `toTextile` object.
