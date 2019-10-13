@@ -1,7 +1,7 @@
 {
-  "name": "to-textile",
-  "version": "0.1.1",
-  "description": "An HTML to Textile converter",
+  "name": "rwe-to-textile",
+  "version": "0.2.8",
+  "description": "An HTML to Textile converter for Redmine WYSIWYG Editor plugin",
   "main": "index.js",
   "directories": {
     "test": "test"
@@ -13,7 +13,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/cmroanirgo/to-textile.git"
+    "url": "https://github.com/taqueci/to-textile.git"
   },
   "keywords": [
     "textile",
@@ -22,9 +22,9 @@
   "author": "cmroanirgo",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/cmroanirgo/to-textile/issues"
+    "url": "https://github.com/taqueci/to-textile/issues"
   },
-  "homepage": "https://github.com/cmroanirgo/to-textile#readme",
+  "homepage": "https://github.com/taqueci",
   "dependencies": {
     "collapse-whitespace": "1.1.2",
     "jsdom": "^9.0.0"
