@@ -1,6 +1,6 @@
 {
   "name": "rwe-to-textile",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "description": "An HTML to Textile converter for Redmine WYSIWYG Editor plugin",
   "main": "index.js",
   "directories": {
