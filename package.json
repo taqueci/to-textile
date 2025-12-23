@@ -1,6 +1,6 @@
 {
   "name": "rwe-to-textile",
-  "version": "0.10.1",
+  "version": "0.10.2",
   "description": "An HTML to Textile converter for Redmine WYSIWYG Editor plugin",
   "main": "index.js",
   "directories": {
@@ -27,12 +27,12 @@
   "homepage": "https://github.com/taqueci",
   "dependencies": {
     "collapse-whitespace": "1.1.2",
-    "jsdom": "^9.0.0"
+    "jsdom": "^27.3.0"
   },
   "devDependencies": {
-    "browserify": "^14.1.0",
-    "uglify-js": "^2.8.16",
-    "watchify": "^3.9.0"
+    "browserify": "^17.0.1",
+    "uglify-js": "^3.19.3",
+    "watchify": "^4.0.0"
   },
   "xdevDependencies": {
     "qunit": "^0.7.6",
