@@ -50,37 +50,6 @@ function htmlToDom (string) {
   return tree
 }
 
-var _reDecCache = {};
-function reDec(val) {
-	var re = _reDecCache[val];
-	if (re) return re;
-	return _reDecCache[val] = re = new RegExp(String.fromCharCode(val), 'g');
-}
-function unglyph(text) { // the opposites of textile-js' glyph.js, with added HTML entities
-	return text
-    .replace( reDec(8594) , '->')//reArrow)
-    .replace( reDec(215) , ' x ')//reDimsign)
-    .replace( reDec(8230) , '...')//reEllipsis)
-    .replace( reDec(8212) , ' -- ')//reEmdash)
-    .replace( reDec(8211) , ' - ')//reEndash)
-    .replace( reDec(8482) , '(tm)')//reTrademark)
-    .replace( reDec(174) , '(r)')//reRegistered)
-    .replace( reDec(169) , '(c)')//reCopyright)
-    .replace( reDec(8243) , '"') //reDoublePrime )
-    .replace( reDec(8221) , '"') //reClosingDQuote )
-    .replace( reDec(8220) , '"') //reOpenDQuote )
-    .replace( reDec(8242) , '\'') //reSinglePrime )
-    .replace( reDec(8217) , '\'') //reApostrophe )
-    .replace( reDec(8217) , '\'') //reClosingSQuote )
-    .replace( reDec(8216) , '\'') //reOpenSQuote )
-    .replace( reDec(188) , "(1\/4)" )
-    .replace( reDec(189) , "(1\/2)" )
-    .replace( reDec(190) , "(3\/4)" )
-    .replace( reDec(176) , "(o)" )
-    .replace( reDec(177) , "(+\/-)")
-    ;
-}
-
 /*
  * Flattens DOM tree into single array
  */
@@ -117,7 +86,7 @@ function getContent (node) {
       text += node.childNodes[i].data
     } else continue
   }
-  return unglyph(text)
+  return text
 }
 
 /*
@@ -188,7 +157,7 @@ function flankingWhitespace (node, content) {
  * `_replacement`
  */
 
-function process (node) {
+function process (node, options) {
   var replacement
   var content = getContent(node)
 
@@ -214,7 +183,7 @@ function process (node) {
         content = content.trim()
       }
       replacement = whitespace.leading +
-        converter.replacement.call(toTextile, content, node) +
+        converter.replacement.call(toTextile, content, node, options) +
         whitespace.trailing
       break
     }
@@ -235,7 +204,9 @@ toTextile = function (input, options) {
   }
 
   // Escape potential ol triggers
-  input = input.replace(/(\d+)\. /g, '$1\\. ')
+  if (!options.ignorePotentialOlTriggers) {
+    input = input.replace(/(\d+)\. /g, '$1\\. ')
+  }
 
   var clone = htmlToDom(input).body
   var nodes = bfsOrder(clone)
@@ -250,9 +221,13 @@ toTextile = function (input, options) {
     converters = options.converters.concat(converters)
   }
 
+  if (options.attributeBlocks !== false) {
+    options.attributeBlocks = true;
+  }
+
   // Process through nodes in reverse (so deepest child elements are first).
   for (var i = nodes.length - 1; i >= 0; i--) {
-    process(nodes[i])
+    process(nodes[i], options)
   }
   output = getContent(clone)
 

@@ -51,37 +51,6 @@ function htmlToDom (string) {
   return tree
 }
 
-var _reDecCache = {};
-function reDec(val) {
-	var re = _reDecCache[val];
-	if (re) return re;
-	return _reDecCache[val] = re = new RegExp(String.fromCharCode(val), 'g');
-}
-function unglyph(text) { // the opposites of textile-js' glyph.js, with added HTML entities
-	return text
-    .replace( reDec(8594) , '->')//reArrow)
-    .replace( reDec(215) , ' x ')//reDimsign)
-    .replace( reDec(8230) , '...')//reEllipsis)
-    .replace( reDec(8212) , ' -- ')//reEmdash)
-    .replace( reDec(8211) , ' - ')//reEndash)
-    .replace( reDec(8482) , '(tm)')//reTrademark)
-    .replace( reDec(174) , '(r)')//reRegistered)
-    .replace( reDec(169) , '(c)')//reCopyright)
-    .replace( reDec(8243) , '"') //reDoublePrime )
-    .replace( reDec(8221) , '"') //reClosingDQuote )
-    .replace( reDec(8220) , '"') //reOpenDQuote )
-    .replace( reDec(8242) , '\'') //reSinglePrime )
-    .replace( reDec(8217) , '\'') //reApostrophe )
-    .replace( reDec(8217) , '\'') //reClosingSQuote )
-    .replace( reDec(8216) , '\'') //reOpenSQuote )
-    .replace( reDec(188) , "(1\/4)" )
-    .replace( reDec(189) , "(1\/2)" )
-    .replace( reDec(190) , "(3\/4)" )
-    .replace( reDec(176) , "(o)" )
-    .replace( reDec(177) , "(+\/-)")
-    ;
-}
-
 /*
  * Flattens DOM tree into single array
  */
@@ -118,7 +87,7 @@ function getContent (node) {
       text += node.childNodes[i].data
     } else continue
   }
-  return unglyph(text)
+  return text
 }
 
 /*
@@ -189,7 +158,7 @@ function flankingWhitespace (node, content) {
  * `_replacement`
  */
 
-function process (node) {
+function process (node, options) {
   var replacement
   var content = getContent(node)
 
@@ -215,7 +184,7 @@ function process (node) {
         content = content.trim()
       }
       replacement = whitespace.leading +
-        converter.replacement.call(toTextile, content, node) +
+        converter.replacement.call(toTextile, content, node, options) +
         whitespace.trailing
       break
     }
@@ -236,7 +205,9 @@ toTextile = function (input, options) {
   }
 
   // Escape potential ol triggers
-  input = input.replace(/(\d+)\. /g, '$1\\. ')
+  if (!options.ignorePotentialOlTriggers) {
+    input = input.replace(/(\d+)\. /g, '$1\\. ')
+  }
 
   var clone = htmlToDom(input).body
   var nodes = bfsOrder(clone)
@@ -251,9 +222,13 @@ toTextile = function (input, options) {
     converters = options.converters.concat(converters)
   }
 
+  if (options.attributeBlocks !== false) {
+    options.attributeBlocks = true;
+  }
+
   // Process through nodes in reverse (so deepest child elements are first).
   for (var i = nodes.length - 1; i >= 0; i--) {
-    process(nodes[i])
+    process(nodes[i], options)
   }
   output = getContent(clone)
 
@@ -269,7 +244,7 @@ toTextile.outer = outer
 
 module.exports = toTextile
 
-},{"./lib/gfm-converters":2,"./lib/html-parser":3,"./lib/tex-converters":4,"collapse-whitespace":5}],2:[function(require,module,exports){
+},{"./lib/gfm-converters":2,"./lib/html-parser":3,"./lib/tex-converters":4,"collapse-whitespace":6}],2:[function(require,module,exports){
 'use strict'
 // TODO:
 module.exports = [];
@@ -410,6 +385,31 @@ function _makeClassId(node) {
 	return '';
 }
 
+function _colorRgbToHex(style) {
+  return style
+    .replace(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/g, function(s, r, g, b) {
+      return '#' + [r, g, b].map(function(x) {
+        return ('0' + parseInt(x).toString(16)).slice(-2);
+      }).join('');
+    });
+}
+
+function _styles(styles) {
+  // Defined in redcloth3.rb
+  var STYLES_RE = /^(color|width|height|border|background|padding|margin|font|float)(-[a-z]+)*:\s*((\d+%?|\d+px|\d+(\.\d+)?em|#[0-9a-f]+|[a-z]+|rgb\(\d+,\s*\d+,\s*\d+\))\s*)+$/i;
+
+  var decl = styles.split(/\s*;\s*/)
+      .filter(function(value) { return STYLES_RE.test(value) });
+
+  if (decl.length === 0) return '';
+
+  var val = decl.map(function(d) {
+    return _colorRgbToHex(d) + ';';
+  }).sort().join(' ');
+
+  return '{' + val + '}';
+}
+
 function _attr(node, filters) {
 	var strings = [];
 	if (node.style.length) {
@@ -427,7 +427,7 @@ function _attr(node, filters) {
 
 		// apply the remaining styles
 		if (styles.length)
-			strings.push('{' + styles + '}');
+			strings.push(_styles(styles));
 	}
 	return strings.join('') + _makeClassId(node);
 }
@@ -449,8 +449,8 @@ function attrImg(node) { // like above, but for images
 module.exports = [
 	{
 		filter: 'p',
-		replacement: function(content, node) {
-			var a = attrBlock(node);
+		replacement: function(content, node, options) {
+			var a = options.attributeBlocks ? attrBlock(node) : '';
 			if (a.length)
 				return '\n\np' + a + '. ' + content + '\n\n'
 			else
@@ -468,8 +468,8 @@ module.exports = [
 
 	{
 		filter: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'],
-		replacement: function(content, node) {
-			var h = node.nodeName.toLowerCase() + attrBlock(node);
+		replacement: function(content, node, options) {
+			var h = node.nodeName.toLowerCase() + (options.attributeBlocks ? attrBlock(node) : '');
 			return '\n\n' + h + '. ' + content + '\n\n'
 		}
 	},
@@ -483,21 +483,21 @@ module.exports = [
 
 	{
 		filter: ['em', 'i'],
-		replacement: function(content, node) {
-			return '_' + attr(node) + content + '_'
+		replacement: function(content, node, options) {
+			return '_' + (options.attributeBlocks ? attr(node) : '') + content + '_'
 		}
 	},
 
 	{
 		filter: ['strong', 'b'],
-		replacement: function(content, node) {
-			return '**' + attr(node) + content + '**'
+		replacement: function(content, node, options) {
+			return '**' + (options.attributeBlocks ? attr(node) : '') + content + '**'
 		}
 	},
 	{
 		filter: ['span'],
-		replacement: function(content, node) {
-			var a = attr(node);
+		replacement: function(content, node, options) {
+			var a = options.attributeBlocks ? attr(node) : '';
 			if (a=='(caps)')
 				// undo textile automatically wrapping [A-Z]{3,} in a <span class="caps">...</span>
 				return content;
@@ -506,32 +506,32 @@ module.exports = [
 	},
 	{
 		filter: ['cite'],
-		replacement: function(content, node) {
-			return '??' + attr(node) + content + '??'
+		replacement: function(content, node, options) {
+			return '??' + (options.attributeBlocks ? attr(node) : '') + content + '??'
 		}
 	},
 	{
 		filter: ['del'],
-		replacement: function(content, node) {
-			return '-' + attr(node) + content + '-'
+		replacement: function(content, node, options) {
+			return '-' + (options.attributeBlocks ? attr(node) : '') + content + '-'
 		}
 	},
 	{
 		filter: ['ins'],
-		replacement: function(content, node) {
-			return '+' + attr(node) + content + '+'
+		replacement: function(content, node, options) {
+			return '+' + (options.attributeBlocks ? attr(node) : '') + content + '+'
 		}
 	},
 	{
 		filter: ['sup'],
-		replacement: function(content, node) {
-			return '^' + attr(node) + content + '^'
+		replacement: function(content, node, options) {
+			return '^' + (options.attributeBlocks ? attr(node) : '') + content + '^'
 		}
 	},
 	{
 		filter: ['sub'],
-		replacement: function(content, node) {
-			return '~' + attr(node) + content + '~'
+		replacement: function(content, node, options) {
+			return '~' + (options.attributeBlocks ? attr(node) : '') + content + '~'
 		}
 	},
 
@@ -543,8 +543,8 @@ module.exports = [
 
 			return node.nodeName === 'CODE' && !isCodeBlock
 		},
-		replacement: function(content, node) {
-			return '@' + attr(node) + content + '@'
+		replacement: function(content, node, options) {
+			return '@' + (options.attributeBlocks ? attr(node) : '') + content + '@'
 		}
 	},
 
@@ -552,7 +552,7 @@ module.exports = [
 		filter: function(node) {
 			return node.nodeName === 'A' && node.getAttribute('href')
 		},
-		replacement: function(content, node) {
+		replacement: function(content, node, options) {
 			var titlePart = node.title ? ' (' + node.title + ')' : '';
 			// CM TODO image links: !openwindow1.gif!:http://hobix.com/
 			return '\"' + content +  titlePart + '\":' + node.getAttribute('href')
@@ -561,12 +561,12 @@ module.exports = [
 
 	{
 		filter: 'img',
-		replacement: function(content, node) {
+		replacement: function(content, node, options) {
 			var alt = node.alt || ''
 			var src = node.getAttribute('src') || '';
 			var title = node.title || alt;
 			var titlePart = title.length ? '(' + title + ')' : '';
-			return src ? '!' + attrImg(node) + src + titlePart + '!' : ''
+			return src ? '!' + (options.attributeBlocks ? attrImg(node) : '') + src + titlePart + '!' : ''
 		}
 	},
 
@@ -575,23 +575,23 @@ module.exports = [
 		filter: function(node) {
 			return node.nodeName === 'PRE' && node.firstChild.nodeName === 'CODE'
 		},
-		replacement: function(content, node) {
-			return '\n\nbc' + attrBlock(node) + '. ' + node.firstChild.textContent + '\n\n'; 
+		replacement: function(content, node, options) {
+			return '\n\nbc' + (options.attributeBlocks ? attrBlock(node) : '') + '. ' + node.firstChild.textContent + '\n\n'; 
 		}
 	},
 
 	{
 		filter: 'blockquote',
-		replacement: function(content, node) {
+		replacement: function(content, node, options) {
 			content = content.trim()
 			content = content.replace(/\n{3,}/g, '\n\n')
-			return '\n\nbq' + attrBlock(node) + '. ' + content + '\n\n'
+			return '\n\nbq' + (options.attributeBlocks ? attrBlock(node) : '') + '. ' + content + '\n\n'
 		}
 	},
 
 	{
 		filter: 'li',
-		replacement: function(content, node) {
+		replacement: function(content, node, options) {
 			var prefix = /ul/i.test(node.parentNode.nodeName) ? '* ': '# ';
 			return prefix + content;
 		}
@@ -599,9 +599,9 @@ module.exports = [
 
 	{
 		filter: ['ul', 'ol'],
-		replacement: function(content, node) {
+		replacement: function(content, node, options) {
 			var strings = [];
-			var a = attr(node); 
+			var a = options.attributeBlocks ? attr(node) : '';
 			
 			for (var i = 0; i < node.childNodes.length; i++) {
 				if (i==0 && a.length) // first LI gets this Lists's attributes
@@ -646,6 +646,51 @@ module.exports = [
 ]
 
 },{}],5:[function(require,module,exports){
+/**
+ * This file automatically generated from `build.js`.
+ * Do not manually edit.
+ */
+
+module.exports = [
+  "address",
+  "article",
+  "aside",
+  "blockquote",
+  "canvas",
+  "dd",
+  "div",
+  "dl",
+  "dt",
+  "fieldset",
+  "figcaption",
+  "figure",
+  "footer",
+  "form",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+  "header",
+  "hgroup",
+  "hr",
+  "li",
+  "main",
+  "nav",
+  "noscript",
+  "ol",
+  "output",
+  "p",
+  "pre",
+  "section",
+  "table",
+  "tfoot",
+  "ul",
+  "video"
+];
+
+},{}],6:[function(require,module,exports){
 'use strict';
 
 var voidElements = require('void-elements');
@@ -783,51 +828,7 @@ function next(prev, current) {
 
 module.exports = collapseWhitespace;
 
-},{"block-elements":6,"void-elements":7}],6:[function(require,module,exports){
-/**
- * This file automatically generated from `build.js`.
- * Do not manually edit.
- */
-
-module.exports = [
-  "address",
-  "article",
-  "aside",
-  "audio",
-  "blockquote",
-  "canvas",
-  "dd",
-  "div",
-  "dl",
-  "fieldset",
-  "figcaption",
-  "figure",
-  "footer",
-  "form",
-  "h1",
-  "h2",
-  "h3",
-  "h4",
-  "h5",
-  "h6",
-  "header",
-  "hgroup",
-  "hr",
-  "main",
-  "nav",
-  "noscript",
-  "ol",
-  "output",
-  "p",
-  "pre",
-  "section",
-  "table",
-  "tfoot",
-  "ul",
-  "video"
-];
-
-},{}],7:[function(require,module,exports){
+},{"block-elements":5,"void-elements":7}],7:[function(require,module,exports){
 /**
  * This file automatically generated from `pre-publish.js`.
  * Do not manually edit.

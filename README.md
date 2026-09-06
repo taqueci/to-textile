@@ -100,6 +100,14 @@ to-textile has beta support for GitHub flavored textile (GFM). Set the `gfm` opt
 toTextile('<del>Hello world!</del>', { gfm: true });
 ```
 
+### `attributeBlocks` (boolean) _Default: true_
+
+Set `attributeBlocks` to false to disable textile attribute blocks.
+
+### `ignorePotentialOlTriggers` (boolean) _Default: false_
+
+By default, to-textile adds an escape character (`\`) to numbers at the beginning of new lines. Set `ignorePotentialOlTriggers` to avoid this behavior.
+
 ## Methods
 
 The following methods can be called on the `toTextile` object.
